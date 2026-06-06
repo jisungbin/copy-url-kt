@@ -5,8 +5,15 @@ set -e
 cd "$(dirname "$0")"
 
 echo "[0] 앱 아이콘 생성"
-python3 gen_appicon.py
-iconutil -c icns build/appicon/CopyUrl.iconset -o build/appicon/CopyUrl.icns
+if python3 -c "import PIL" 2>/dev/null; then
+  python3 gen_appicon.py
+  iconutil -c icns build/appicon/CopyUrl.iconset -o build/appicon/CopyUrl.icns
+elif [ -f build/appicon/CopyUrl.icns ]; then
+  echo "    → Pillow 없음: 기존 build/appicon/CopyUrl.icns 재사용"
+else
+  echo "    → Pillow가 없어 아이콘을 생성할 수 없습니다. 기존 CopyUrl.icns도 없습니다." >&2
+  exit 1
+fi
 
 echo "[1] 컴파일 + 의존성 모으기 (installDist)"
 ./gradlew installDist --console=plain -q
@@ -20,7 +27,6 @@ rm -rf build/jpackage
   --input build/install/copy-url-kt/lib \
   --main-jar "$MAINJAR" \
   --main-class dev.jisungbin.copyurl.MainKt \
-  --java-options -XstartOnFirstThread \
   --mac-package-identifier dev.jisungbin.copyurl \
   --icon build/appicon/CopyUrl.icns \
   --dest build/jpackage
@@ -30,7 +36,11 @@ echo "[3] LSUIElement 추가 (Dock 미표시)"
   build/jpackage/CopyUrl.app/Contents/Info.plist 2>/dev/null || true
 
 echo "[4] 기존 앱 종료 + /Applications 교체"
-pkill -9 -f "CopyUrl" 2>/dev/null || true
+osascript -e 'tell application id "dev.jisungbin.copyurl" to quit' 2>/dev/null || true
+sleep 1
+while IFS= read -r pid; do
+  kill "$pid" 2>/dev/null || true
+done < <(pgrep -f "/Applications/CopyUrl.app/Contents/MacOS/CopyUrl" || true)
 rm -rf /Applications/CopyUrl.app
 cp -R build/jpackage/CopyUrl.app /Applications/
 # 자체 서명 — ad-hoc 으로는 자동화(크롬 제어) 권한을 못 받으므로 안정적 식별을 위해 재서명.

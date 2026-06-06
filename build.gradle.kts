@@ -1,5 +1,7 @@
 plugins {
     kotlin("jvm") version "2.4.0-RC2"
+    id("org.jetbrains.compose") version "1.12.0-alpha01"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0-RC2"
     application
 }
 
@@ -7,6 +9,8 @@ group = "dev.jisungbin"
 version = "1.0.0"
 
 dependencies {
+    implementation(compose.desktop.currentOs)
+    implementation(compose.material3)
     implementation("net.java.dev.jna:jna:5.18.1")
 }
 
@@ -16,6 +20,4 @@ kotlin {
 
 application {
     mainClass = "dev.jisungbin.copyurl.MainKt"
-    // macOS GUI(NSApp 런루프 + Carbon 핫키)는 메인 스레드(thread 0)에서 돌아야 한다.
-    applicationDefaultJvmArgs = listOf("-XstartOnFirstThread")
 }
