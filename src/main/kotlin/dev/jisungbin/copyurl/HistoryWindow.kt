@@ -1,6 +1,9 @@
 package dev.jisungbin.copyurl
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,11 +51,15 @@ private val SubtleText = Color(0xFF64748B)
 private val UrlText = Color(0xFF1E293B)
 private val CleanGreen = Color(0xFF059669)
 private val FullBlue = Color(0xFF2563EB)
+private val ClearButtonBackground = Color(0xFFFEE2E2)
+private val ClearButtonText = Color(0xFFDC2626)
 
 @Composable
 fun HistoryWindow(
     entries: List<CopiedUrlEntry>,
     onCopy: (String) -> Unit,
+    onDelete: (CopiedUrlEntry) -> Unit,
+    onClear: () -> Unit,
     listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
@@ -65,7 +72,7 @@ fun HistoryWindow(
                 .background(Background),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Header(count = entries.size)
+                Header(count = entries.size, onClear = onClear)
                 if (entries.isEmpty()) {
                     EmptyHistory()
                 } else {
@@ -80,7 +87,11 @@ fun HistoryWindow(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(entries, key = CopiedUrlEntry::url) { entry ->
-                            HistoryItem(entry = entry, onClick = { onCopy(entry.url) })
+                            HistoryItem(
+                                entry = entry,
+                                onClick = { onCopy(entry.url) },
+                                onLongClick = { onDelete(entry) },
+                            )
                         }
                     }
                 }
@@ -105,15 +116,29 @@ private fun Modifier.topFadingEdge(fadeHeight: Dp = 28.dp) = this
     }
 
 @Composable
-private fun Header(count: Int) {
-    Column(
+private fun Header(count: Int, onClear: () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = "복사 기록", color = TitleColor, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-        Text(text = "최근 ${count}개 URL", color = SubtleText, fontSize = 12.sp)
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(text = "복사 기록", color = TitleColor, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(text = "최근 ${count}개 URL", color = SubtleText, fontSize = 12.sp)
+        }
+        if (count > 0) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(ClearButtonBackground)
+                    .clickable(onClick = onClear)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Text(text = "전체 삭제", color = ClearButtonText, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+        }
     }
 }
 
@@ -124,17 +149,24 @@ private fun EmptyHistory() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HistoryItem(entry: CopiedUrlEntry, onClick: () -> Unit) {
+private fun HistoryItem(entry: CopiedUrlEntry, onClick: () -> Unit, onLongClick: () -> Unit) {
     val accent = if (entry.cleaned) CleanGreen else FullBlue
     Card(
-        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
+        // 클릭=재복사, 길게 누르기=삭제. Card 가 shape 로 clip 하므로 리플은 카드 안에 갇힌다.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(14.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
             Box(
                 modifier = Modifier
                     .width(4.dp)

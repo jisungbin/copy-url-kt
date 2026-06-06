@@ -28,4 +28,12 @@ class CopyUrlAppState {
             history.removeRange(MaxHistorySize, history.size)
         }
     }
+
+    fun remove(entry: CopiedUrlEntry) {
+        history.remove(entry)
+    }
+
+    fun clear() {
+        history.clear()
+    }
 }

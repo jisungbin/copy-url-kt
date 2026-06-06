@@ -111,6 +111,8 @@ fun main() {
                     ClipboardUtil.set(url)
                     Notifier.notify("URL 다시 복사됨", url)
                 },
+                onDelete = appState::remove,
+                onClear = appState::clear,
                 listState = listState,
             )
         }
