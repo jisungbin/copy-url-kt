@@ -30,7 +30,7 @@ object ObjC {
     fun sendP(receiver: Pointer, selector: String, vararg args: Any): Pointer? =
         msgSend.invokePointer(arrayOf(receiver, sel(selector), *args))
 
-    fun sendV(receiver: Pointer, selector: String, vararg args: Any) {
+    fun sendV(receiver: Pointer, selector: String, vararg args: Any?) {
         msgSend.invoke(Void.TYPE, arrayOf(receiver, sel(selector), *args))
     }
 
