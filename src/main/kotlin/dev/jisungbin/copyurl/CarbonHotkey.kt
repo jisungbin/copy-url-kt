@@ -49,6 +49,8 @@ object CarbonHotkey {
             outRef: PointerByReference,
         ): Int
 
+        fun UnregisterEventHotKey(inHotKey: Pointer): Int
+
         companion object {
             val INSTANCE: Carbon by lazy { Native.load("Carbon", Carbon::class.java) }
         }
@@ -76,6 +78,13 @@ object CarbonHotkey {
     private val hotKeyRef = PointerByReference()
     private val handlerOutRef = PointerByReference()
 
+    // setEnabled 로 핫키를 동적으로 켜고 끄기 위해 register 시점의 컨텍스트를 보관한다.
+    private var carbon: Carbon? = null
+    private var eventTarget: Pointer? = null
+    private var modifiers = 0
+    private var keyCode = 0
+    private var enabled = false
+
     /** 4글자 OSType 을 빅엔디안 Int 로 변환 ('keyb', 'htk1' 등). */
     private fun osType(s: String): Int {
         var r = 0
@@ -83,7 +92,12 @@ object CarbonHotkey {
         return r
     }
 
-    /** @return 등록 성공 여부 (실패 시 호출 측에서 CGEventTap 등으로 폴백). */
+    /**
+     * 키보드 이벤트 핸들러를 설치하고 핫키 파라미터를 보관한다. 실제 키 가로채기는
+     * [setEnabled] 로 켜야 시작된다 — frontmost 앱에 따라 동적으로 켜고 끄기 위함.
+     *
+     * @return 핸들러 설치 성공 여부 (실패 시 호출 측에서 CGEventTap 등으로 폴백).
+     */
     fun register(modifiers: Int, keyCode: Int, onPressed: () -> Unit): Boolean {
         val carbon = try {
             Carbon.INSTANCE
@@ -121,21 +135,44 @@ object CarbonHotkey {
             return false
         }
 
-        val hotKeyId = EventHotKeyID.ByValue().apply {
-            signature = osType("htk1")
-            id = 1
-            write()
-        }
-
-        val regStatus = carbon.RegisterEventHotKey(
-            keyCode, modifiers, hotKeyId, target, 0, hotKeyRef,
-        )
-        if (regStatus != 0) {
-            System.err.println("[copy-url] RegisterEventHotKey 실패: status=$regStatus")
-            return false
-        }
-
-        println("[copy-url] ✅ 전역 핫키 등록 성공 (modifiers=$modifiers, keyCode=$keyCode)")
+        this.carbon = carbon
+        eventTarget = target
+        this.modifiers = modifiers
+        this.keyCode = keyCode
         return true
+    }
+
+    /**
+     * 핫키 가로채기를 켜거나 끈다. 켜짐 = OS 가 키 조합을 우리 앱에 독점 전달,
+     * 꺼짐 = 다른 앱으로 통과. 중복 호출은 무시한다.
+     * [register] 성공 후, register 와 같은 스레드(AWT EDT)에서 호출해야 한다.
+     */
+    fun setEnabled(enabled: Boolean) {
+        if (enabled == this.enabled) return
+        val carbon = carbon ?: return
+        val target = eventTarget ?: return
+
+        if (enabled) {
+            val hotKeyId = EventHotKeyID.ByValue().apply {
+                signature = osType("htk1")
+                id = 1
+                write()
+            }
+            val status = carbon.RegisterEventHotKey(
+                keyCode, modifiers, hotKeyId, target, 0, hotKeyRef,
+            )
+            if (status != 0) {
+                System.err.println("[copy-url] RegisterEventHotKey 실패: status=$status")
+                return
+            }
+        } else {
+            val ref = hotKeyRef.value ?: return
+            val status = carbon.UnregisterEventHotKey(ref)
+            if (status != 0) {
+                System.err.println("[copy-url] UnregisterEventHotKey 실패: status=$status")
+                return
+            }
+        }
+        this.enabled = enabled
     }
 }

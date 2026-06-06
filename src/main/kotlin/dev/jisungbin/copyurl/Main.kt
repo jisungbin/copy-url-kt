@@ -69,7 +69,13 @@ fun main() {
             ) {
                 worker.submit { onHotkey(appState) }
             }
-            Dbg.log(if (ok) "핫키 등록 완료" else "⚠️ 핫키 등록 실패")
+            Dbg.log(if (ok) "핫키 핸들러 설치 완료" else "⚠️ 핫키 핸들러 설치 실패")
+            if (ok) {
+                // Chrome 이 맨 앞일 때만 핫키 활성화 → 다른 앱에선 Cmd+Shift+C 가 그 앱으로 통과
+                ChromeFocusGate.start { isChrome ->
+                    SwingUtilities.invokeLater { CarbonHotkey.setEnabled(isChrome) }
+                }
+            }
 
             onDispose { MacStatusBar.close() }
         }
